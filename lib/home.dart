@@ -71,13 +71,15 @@ class _HomeState extends State<Home> {
       '/ws',
       () => plus.WebSocketSession(
         onOpen: (ws) {
-          // Join chat
           user = ws;
-          user?.send("A new user joined the chat.");
+          user?.send("欢迎使用，炜哥出品。");
+          setState(() {});
         },
         onClose: (ws) {
           // Leave chat
           user = null;
+          timer?.cancel();
+          setState(() {});
           // for (var user in users) {
           //   user.send('A user has left.');
           // }
@@ -85,13 +87,15 @@ class _HomeState extends State<Home> {
         onMessage: (ws, dynamic data) {
           // Deliver messages to all users
           timer?.cancel();
-          timer = Timer.periodic(const Duration(seconds: 3), (_) {
-            flag = false;
-            comparisonFile();
-            if (flag) {
-              user?.send('1');
-            }
-          });
+          if (user != null) {
+            timer = Timer.periodic(const Duration(seconds: 3), (_) {
+              flag = false;
+              comparisonFile();
+              if (flag) {
+                user?.send('1');
+              }
+            });
+          }
         },
       ),
     );
@@ -177,6 +181,7 @@ class _HomeState extends State<Home> {
           children: [
             Wrap(
               spacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 ElevatedButton(
                   onPressed: () {
@@ -192,6 +197,7 @@ class _HomeState extends State<Home> {
                   },
                   child: const Text("保存路径"),
                 ),
+                Text('用户：${user?.hashCode ?? '无'}')
               ],
             ),
             const SizedBox(height: 6),
