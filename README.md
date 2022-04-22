@@ -2,6 +2,8 @@
 
 监听文件并刷新
 
+![Image text](./doc/1.png)
+
 ## 添加文件路径实现监听
 - WebSocket地址: ws://localhost:4444/ws
 - Ajax GET地址: http://localhost:4444/r
