@@ -3,7 +3,8 @@
 监听文件并刷新
 
 ## 添加文件路径实现监听
-
+- WebSocket地址: ws://localhost:4444/ws
+- Ajax GET地址: http://localhost:4444/r
 - 选择监听路径尽可能范围小
 - 只监听 'html', 'css', 'js'文件
 - 项目页面引入js文件(在项目中或者在安装包中listenFileAndRefresh.js)

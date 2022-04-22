@@ -22,6 +22,10 @@ class _HomeState extends State<Home> {
   Map files = {};
   List<String> paths = [];
   Timer? timer;
+  var app = plus.Router().plus;
+  late HttpServer server;
+  bool flag = false;
+  List<plus.WebSocketSession> users = [];
 
   @override
   void initState() {
@@ -36,10 +40,19 @@ class _HomeState extends State<Home> {
     timer?.cancel();
   }
 
-  var app = plus.Router().plus;
-  late HttpServer server;
-  bool flag = false;
-  plus.WebSocketSession? user;
+  timeSendMsg() {
+    timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (users.isNotEmpty) {
+        flag = false;
+        comparisonFile();
+        if (flag) {
+          for (var user in users) {
+            user.send('1');
+          }
+        }
+      }
+    });
+  }
 
   getCache() async {
     final prefs = await SharedPreferences.getInstance();
@@ -71,35 +84,26 @@ class _HomeState extends State<Home> {
       '/ws',
       () => plus.WebSocketSession(
         onOpen: (ws) {
-          user = ws;
-          user?.send("欢迎使用，炜哥出品。");
+          users.add(ws);
+          users.where((user) => user != ws).forEach((user) => user.send("欢迎使用，炜哥出品。"));
           setState(() {});
         },
         onClose: (ws) {
           // Leave chat
-          user = null;
-          timer?.cancel();
+          users.remove(ws);
+          for (var user in users) {
+            user.send('有缘再见，炜哥出品。');
+          }
           setState(() {});
-          // for (var user in users) {
-          //   user.send('A user has left.');
-          // }
         },
         onMessage: (ws, dynamic data) {
           // Deliver messages to all users
-          timer?.cancel();
-          if (user != null) {
-            timer = Timer.periodic(const Duration(seconds: 3), (_) {
-              flag = false;
-              comparisonFile();
-              if (flag) {
-                user?.send('1');
-              }
-            });
-          }
+          timeSendMsg();
         },
       ),
     );
     server = await io.serve(app, 'localhost', 4444);
+    timeSendMsg();
   }
 
   comparisonFile() {
@@ -197,7 +201,7 @@ class _HomeState extends State<Home> {
                   },
                   child: const Text("保存路径"),
                 ),
-                Text('用户：${user?.hashCode ?? '无'}')
+                Text('用户数：${users.length}个')
               ],
             ),
             const SizedBox(height: 6),
