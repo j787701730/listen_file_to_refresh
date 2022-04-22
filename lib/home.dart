@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:listen_file_to_refresh/input.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,6 +21,7 @@ class _HomeState extends State<Home> {
   String value = '';
   Map files = {};
   List<String> paths = [];
+  Timer? timer;
 
   @override
   void initState() {
@@ -27,9 +30,16 @@ class _HomeState extends State<Home> {
     init();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+    timer?.cancel();
+  }
+
   var app = plus.Router().plus;
   late HttpServer server;
   bool flag = false;
+  plus.WebSocketSession? user;
 
   getCache() async {
     final prefs = await SharedPreferences.getInstance();
@@ -56,6 +66,35 @@ class _HomeState extends State<Home> {
       comparisonFile();
       return plus.Response.ok(jsonEncode({'msg': flag}));
     });
+
+    app.get(
+      '/ws',
+      () => plus.WebSocketSession(
+        onOpen: (ws) {
+          // Join chat
+          user = ws;
+          user?.send("A new user joined the chat.");
+        },
+        onClose: (ws) {
+          // Leave chat
+          user = null;
+          // for (var user in users) {
+          //   user.send('A user has left.');
+          // }
+        },
+        onMessage: (ws, dynamic data) {
+          // Deliver messages to all users
+          timer?.cancel();
+          timer = Timer.periodic(const Duration(seconds: 3), (_) {
+            flag = false;
+            comparisonFile();
+            if (flag) {
+              user?.send('1');
+            }
+          });
+        },
+      ),
+    );
     server = await io.serve(app, 'localhost', 4444);
   }
 
@@ -90,7 +129,7 @@ class _HomeState extends State<Home> {
     }
   }
 
-  getFile(path) {
+  getFile(String path) {
     File f = File(path);
     // print('获取文件最后修改时间: ${f.lastModifiedSync()}');
     String lastModified = f.lastModifiedSync().toString();
@@ -100,8 +139,31 @@ class _HomeState extends State<Home> {
         flag = true;
       }
     } else {
-      files[path] = lastModified;
-      flag = true;
+      String suffix = path.substring(path.lastIndexOf('.') + 1);
+      if (['html', 'css', 'js'].contains(suffix)) {
+        files[path] = lastModified;
+        flag = true;
+      }
+    }
+  }
+
+  selectedFile(index) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(lockParentWindow: true);
+    if (result != null) {
+      setState(() {
+        files.clear();
+        paths[index] = result.files.single.path ?? '';
+      });
+    }
+  }
+
+  selectedFolder(index) async {
+    String? selectedDirectory = await FilePicker.platform.getDirectoryPath(lockParentWindow: true);
+    if (selectedDirectory != null) {
+      setState(() {
+        files.clear();
+        paths[index] = selectedDirectory;
+      });
     }
   }
 
@@ -136,32 +198,48 @@ class _HomeState extends State<Home> {
             Expanded(
               child: ListView.builder(
                 itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Input(
-                            onChanged: (v) {
-                              paths[index] = v.trim();
-                            },
-                            value: paths[index],
-                          ),
-                        ),
-                        IconButton(
-                          splashRadius: 17,
-                          onPressed: () {
-                            setState(() {
-                              paths.removeAt(index);
-                            });
+                  return Row(
+                    children: [
+                      Expanded(
+                        // child: SelectableText(paths[index]),
+                        child: Input(
+                          onChanged: (v) {
+                            paths[index] = v.trim();
                           },
-                          icon: const Icon(
-                            CupertinoIcons.clear,
-                            color: Colors.red,
-                          ),
+                          value: paths[index],
                         ),
-                      ],
-                    ),
+                      ),
+                      IconButton(
+                        splashRadius: 17,
+                        onPressed: () {
+                          selectedFile(index);
+                        },
+                        icon: const Icon(
+                          Icons.insert_drive_file_outlined,
+                        ),
+                      ),
+                      IconButton(
+                        splashRadius: 17,
+                        onPressed: () {
+                          selectedFolder(index);
+                        },
+                        icon: const Icon(
+                          Icons.folder_outlined,
+                        ),
+                      ),
+                      IconButton(
+                        splashRadius: 17,
+                        onPressed: () {
+                          setState(() {
+                            paths.removeAt(index);
+                          });
+                        },
+                        icon: const Icon(
+                          CupertinoIcons.clear,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
                   );
                 },
                 itemCount: paths.length,

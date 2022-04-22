@@ -1,11 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:listen_file_to_refresh/home.dart';
 import 'package:protocol_handler/protocol_handler.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
-
-import 'home.dart';
 
 const String appName = '监听文件并刷新';
 
@@ -13,17 +12,18 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Must add this line.
   await windowManager.ensureInitialized();
-  // 开启关闭拦截功能
-  await windowManager.setPreventClose(true);
+
   // Use it only after calling `hiddenWindowAtLaunch`
+  await protocolHandler.register('listenfiletorefresh');
   windowManager.waitUntilReadyToShow().then((_) async {
     // Hide window title bar
-    await protocolHandler.register('listenFileToRefresh');
     await windowManager.setSize(const Size(800, 600));
-    await windowManager.setTitle(appName);
+    // await windowManager.setTitle(appName);
     await windowManager.center();
     await windowManager.show();
     // await windowManager.setSkipTaskbar(false);
+    // 开启关闭拦截功能
+    await windowManager.setPreventClose(true);
   });
   runApp(const MyApp());
 }
@@ -35,12 +35,13 @@ class MyApp extends StatefulWidget {
   _MyAppState createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> with TrayListener, WindowListener {
+class _MyAppState extends State<MyApp> with TrayListener, WindowListener, ProtocolListener {
   bool maximizeFlag = false;
 
   @override
   void initState() {
     super.initState();
+    protocolHandler.addListener(this);
     trayManager.addListener(this);
     windowManager.addListener(this);
     setTray();
@@ -127,6 +128,7 @@ class _MyAppState extends State<MyApp> with TrayListener, WindowListener {
     super.dispose();
     trayManager.removeListener(this);
     windowManager.removeListener(this);
+    protocolHandler.removeListener(this);
   }
 
   @override
