@@ -91,10 +91,7 @@ class _HomeState extends State<Home> {
           users.remove(ws);
           setState(() {});
         },
-        onMessage: (ws, dynamic data) {
-          // Deliver messages to all users
-          timeSendMsg();
-        },
+        onMessage: (ws, dynamic data) {},
       ),
     );
     server = await io.serve(app, 'localhost', 4444);
