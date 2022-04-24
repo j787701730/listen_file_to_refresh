@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 import 'package:flutter/material.dart';
-import 'package:shelf_plus/shelf_plus.dart' as plus;
+import 'package:flutter/services.dart';
+import 'package:intranet_ip/intranet_ip.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shelf/shelf_io.dart' as io;
+import 'package:shelf_cors_headers/shelf_cors_headers.dart';
+import 'package:shelf_plus/shelf_plus.dart' as plus;
 
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
@@ -25,6 +28,8 @@ class _HomeState extends State<Home> {
   bool flag = false;
   List<plus.WebSocketSession> users = [];
   int filesLimit = 3000;
+  String ip = '';
+  int port = 4444;
 
   @override
   void initState() {
@@ -66,7 +71,16 @@ class _HomeState extends State<Home> {
       ScaffoldMessenger.of(context).clearSnackBars();
     }
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(SnackBar(content: Text(msg)));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: const TextStyle(
+            fontFamily: '微软雅黑',
+          ),
+        ),
+      ),
+    );
   }
 
   setCache() async {
@@ -94,8 +108,10 @@ class _HomeState extends State<Home> {
         onMessage: (ws, dynamic data) {},
       ),
     );
-    server = await io.serve(app, 'localhost', 4444);
+    ip = (await intranetIpv4()).address;
+    server = await io.serve(app, ip, port);
     timeSendMsg();
+    setState(() {});
   }
 
   comparisonFile() {
@@ -206,6 +222,13 @@ class _HomeState extends State<Home> {
                     setCache();
                   },
                   child: const Text("保存路径"),
+                ),
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: 'ws://$ip:$port/ws'));
+                    toast("复制成功: $ip:$port");
+                  },
+                  child: Text('WebSocket地址：ws://$ip:$port/ws'),
                 ),
                 Text('用户数：${users.length}个'),
                 Text('文件数：${files.length}个'),

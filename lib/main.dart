@@ -18,6 +18,7 @@ void main() async {
   windowManager.waitUntilReadyToShow().then((_) async {
     // Hide window title bar
     await windowManager.setSize(const Size(800, 600));
+    await windowManager.setMinimumSize(const Size(800, 600));
     // await windowManager.setTitle(appName);
     await windowManager.center();
     await windowManager.show();
