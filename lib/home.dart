@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:listen_file_to_refresh/input.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +24,7 @@ class _HomeState extends State<Home> {
   late HttpServer server;
   bool flag = false;
   List<plus.WebSocketSession> users = [];
+  int filesLimit = 3000;
 
   @override
   void initState() {
@@ -61,39 +60,35 @@ class _HomeState extends State<Home> {
     });
   }
 
-  setCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('paths', paths);
+  toast(msg) {
     if (ScaffoldMessenger.of(context).mounted) {
       // 清理
       ScaffoldMessenger.of(context).clearSnackBars();
     }
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text("保存成功")));
+    messenger.showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  setCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('paths', paths);
+    toast("保存成功");
   }
 
   init() async {
     app.use(corsHeaders());
-    app.get('/r', (plus.Request request) {
-      flag = false;
-      comparisonFile();
-      return plus.Response.ok(jsonEncode({'msg': flag}));
-    });
-
     app.get(
       '/ws',
       () => plus.WebSocketSession(
         onOpen: (ws) {
           users.add(ws);
-          users.where((user) => user != ws).forEach((user) => user.send("欢迎使用，炜哥出品。"));
+          ws.send("欢迎使用，炜哥出品。");
           setState(() {});
         },
         onClose: (ws) {
           // Leave chat
+          ws.send('有缘再见，炜哥出品。');
           users.remove(ws);
-          for (var user in users) {
-            user.send('有缘再见，炜哥出品。');
-          }
           setState(() {});
         },
         onMessage: (ws, dynamic data) {
@@ -123,36 +118,50 @@ class _HomeState extends State<Home> {
   }
 
   dirEach(path) {
-    List<FileSystemEntity> fileList = Directory(path).listSync();
-    if (fileList.isNotEmpty) {
-      for (FileSystemEntity p in fileList) {
-        if (FileSystemEntity.isDirectorySync(p.path)) {
-          dirEach(p.path);
-          // 文件夹
-        } else if (FileSystemEntity.isFileSync(p.path)) {
-          // 文件
-          getFile(p.path);
+    try {
+      if (files.length >= filesLimit) {
+        return;
+      } else {
+        List<FileSystemEntity> fileList = Directory(path).listSync();
+        if (fileList.isNotEmpty) {
+          for (FileSystemEntity p in fileList) {
+            if (FileSystemEntity.isDirectorySync(p.path)) {
+              dirEach(p.path);
+              // 文件夹
+            } else if (FileSystemEntity.isFileSync(p.path)) {
+              // 文件
+              getFile(p.path);
+            }
+          }
         }
       }
-    }
+    } catch (_) {}
   }
 
   getFile(String path) {
-    File f = File(path);
-    // print('获取文件最后修改时间: ${f.lastModifiedSync()}');
-    String lastModified = f.lastModifiedSync().toString();
-    if (files[path] != null) {
-      if (files[path] != lastModified) {
-        files[path] = lastModified;
-        flag = true;
+    try {
+      File f = File(path);
+      // print('获取文件最后修改时间: ${f.lastModifiedSync()}');
+      String lastModified = f.lastModifiedSync().toString();
+      if (files[path] != null) {
+        if (files[path] != lastModified) {
+          files[path] = lastModified;
+          flag = true;
+        }
+      } else {
+        String suffix = path.substring(path.lastIndexOf('.') + 1);
+        if (files.length >= filesLimit) {
+          toast("监听文件数超过2000");
+          setState(() {});
+          return;
+        } else {
+          if (['html', 'css', 'js'].contains(suffix)) {
+            files[path] = lastModified;
+            flag = true;
+          }
+        }
       }
-    } else {
-      String suffix = path.substring(path.lastIndexOf('.') + 1);
-      if (['html', 'css', 'js'].contains(suffix)) {
-        files[path] = lastModified;
-        flag = true;
-      }
-    }
+    } catch (_) {}
   }
 
   selectedFile(index) async {
@@ -201,7 +210,8 @@ class _HomeState extends State<Home> {
                   },
                   child: const Text("保存路径"),
                 ),
-                Text('用户数：${users.length}个')
+                Text('用户数：${users.length}个'),
+                Text('文件数：${files.length}个'),
               ],
             ),
             const SizedBox(height: 6),
@@ -211,13 +221,22 @@ class _HomeState extends State<Home> {
                   return Row(
                     children: [
                       Expanded(
-                        // child: SelectableText(paths[index]),
-                        child: Input(
-                          onChanged: (v) {
-                            paths[index] = v.trim();
-                          },
-                          value: paths[index],
+                        child: Container(
+                          height: 34,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xffdddddd)),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: SelectableText(paths[index]),
                         ),
+                        // child: Input(
+                        //   onChanged: (v) {
+                        //     paths[index] = v.trim();
+                        //   },
+                        //   value: paths[index],
+                        // ),
                       ),
                       IconButton(
                         splashRadius: 17,
